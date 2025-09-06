@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herbalife Inventory Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <nav class="sidebar bg-success text-white p-0" style="min-height: 100vh; width: 250px;">
+            <div class="p-4 border-bottom border-light">
+                <h4 class="mb-0">
+                    <i class="fas fa-leaf me-2"></i>
+                    Herbalife Inventory
+                </h4>
+            </div>
+            
+            <div class="mt-3">
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt me-3"></i>
+                    Dashboard
+                </button>
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="products">
+                    <i class="fas fa-box me-3"></i>
+                    Products
+                </button>
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="customers">
+                    <i class="fas fa-users me-3"></i>
+                    Customers
+                </button>
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="sales">
+                    <i class="fas fa-shopping-cart me-3"></i>
+                    Record Sale
+                </button>
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="purchases">
+                    <i class="fas fa-truck me-3"></i>
+                    Record Purchase
+                </button>
+                <button class="nav-btn btn w-100 text-start py-3 px-4 border-0 text-white" data-section="reports">
+                    <i class="fas fa-chart-bar me-3"></i>
+                    Stock Reports
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="flex-grow-1 bg-light" style="min-height: 100vh;">
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="content-section p-4">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Dashboard</h2>
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Last updated: <span id="last-updated"></span>
+                    </small>
+                </div>
+
+                <div class="row" id="dashboard-stats">
+                    <!-- Stats cards will be populated by JavaScript -->
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    Quick Overview
+                                </h5>
+                            </div>
+                            <div class="card-body" id="quick-overview">
+                                <!-- Quick overview will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Low Stock Alert
+                                </h5>
+                            </div>
+                            <div class="card-body" id="low-stock-alert">
+                                <!-- Low stock alerts will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Section -->
+            <div id="products" class="content-section p-4" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Products Management</h2>
+                    <button class="btn btn-success" id="add-product-btn">
+                        <i class="fas fa-plus me-2"></i>Add Product
+                    </button>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-box me-2"></i>
+                                    Product Inventory (<span id="product-count">0</span>)
+                                </h5>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="product-search" placeholder="Search products...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Cost</th>
+                                        <th>Stock</th>
+                                        <th>Status</th>
+                                        <th>Margin</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-table">
+                                    <!-- Products will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customers Section -->
+            <div id="customers" class="content-section p-4" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Customer Management</h2>
+                    <button class="btn btn-success" id="add-customer-btn">
+                        <i class="fas fa-plus me-2"></i>Add Customer
+                    </button>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-users me-2"></i>
+                                    Customer Database (<span id="customer-count">0</span>)
+                                </h5>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="customer-search" placeholder="Search customers...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Customer Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Address</th>
+                                        <th>Joined</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-table">
+                                    <!-- Customers will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Section -->
+            <div id="sales" class="content-section p-4" style="display: none;">
+                <div class="d-flex align-items-center mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Record Sale</h2>
+                </div>
+
+                <form id="sales-form">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-shopping-cart me-2"></i>
+                                        Sale Items
+                                    </h5>
+                                </div>
+                                <div class="card-body" id="sale-items-container">
+                                    <!-- Sale items will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-user me-2"></i>
+                                        Customer
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <select class="form-select" id="sale-customer" required>
+                                        <option value="">Select Customer</option>
+                                    </select>
+                                    <div id="selected-customer-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
+                                        <!-- Selected customer info will be displayed here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-calculator me-2"></i>
+                                        Order Summary
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Subtotal:</span>
+                                        <span class="fw-bold" id="sale-subtotal">₹0.00</span>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between mb-3">
+                                        <span class="h5">Total:</span>
+                                        <span class="h5 text-success fw-bold" id="sale-total">₹0.00</span>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100" id="complete-sale-btn" disabled>
+                                        <i class="fas fa-shopping-cart me-2"></i>
+                                        Complete Sale & Download Invoice
+                                    </button>
+                                    <button type="button" class="btn btn-info w-100 mt-2" onclick="sendBillToCustomer()">
+                                        <i class="fas fa-paper-plane me-2"></i>
+                                        Send Bill to Customer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Purchases Section -->
+            <div id="purchases" class="content-section p-4" style="display: none;">
+                <div class="d-flex align-items-center mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Record Purchase</h2>
+                </div>
+
+                <form id="purchase-form">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-truck me-2"></i>
+                                        Purchase Items
+                                    </h5>
+                                </div>
+                                <div class="card-body" id="purchase-items-container">
+                                    <!-- Purchase items will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-building me-2"></i>
+                                        Supplier
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <input type="text" class="form-control" id="purchase-supplier" placeholder="Enter supplier name" required>
+                                </div>
+                            </div>
+
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-calculator me-2"></i>
+                                        Purchase Summary
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Subtotal:</span>
+                                        <span class="fw-bold" id="purchase-subtotal">₹0.00</span>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between mb-3">
+                                        <span class="h5">Total:</span>
+                                        <span class="h5 text-success fw-bold" id="purchase-total">₹0.00</span>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100" id="complete-purchase-btn" disabled>
+                                        <i class="fas fa-truck me-2"></i>
+                                        Complete Purchase & Download Invoice
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Reports Section -->
+            <div id="reports" class="content-section p-4" style="display: none;">
+                <div class="d-flex align-items-center mb-4">
+                    <h2 class="mb-0 text-success fw-bold">Stock Reports</h2>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-bar me-2"></i>
+                                    Inventory Reports
+                                </h5>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="btn-group" role="group">
+                                    <input type="radio" class="btn-check" name="report-filter" id="all-products" value="all" checked>
+                                    <label class="btn btn-outline-light btn-sm" for="all-products">All Products</label>
+
+                                    <input type="radio" class="btn-check" name="report-filter" id="low-stock" value="low">
+                                    <label class="btn btn-outline-light btn-sm" for="low-stock">Low Stock</label>
+
+                                    <input type="radio" class="btn-check" name="report-filter" id="out-of-stock" value="out">
+                                    <label class="btn btn-outline-light btn-sm" for="out-of-stock">Out of Stock</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Current Stock</th>
+                                        <th>Min Stock</th>
+                                        <th>Value</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reports-table">
+                                    <!-- Reports will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-box me-2"></i>
+                        <span id="product-modal-title">Add New Product</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="product-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Product Name *</label>
+                                    <input type="text" class="form-control" id="product-name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Category *</label>
+                                    <select class="form-select" id="product-category" required>
+                                        <option value="">Select Category</option>
+                                        <option value="Nutrition">Nutrition</option>
+                                        <option value="Energy">Energy</option>
+                                        <option value="Digestive Health">Digestive Health</option>
+                                        <option value="Weight Management">Weight Management</option>
+                                        <option value="Sports Nutrition">Sports Nutrition</option>
+                                        <option value="Personal Care">Personal Care</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Selling Price (₹) *</label>
+                                    <input type="number" step="0.01" class="form-control" id="product-price" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Cost Price (₹) *</label>
+                                    <input type="number" step="0.01" class="form-control" id="product-cost" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Current Stock *</label>
+                                    <input type="number" class="form-control" id="product-stock" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Minimum Stock *</label>
+                                    <input type="number" class="form-control" id="product-min-stock" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" rows="3" id="product-description" placeholder="Enter product description..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-2"></i>
+                            <span id="product-submit-text">Add Product</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Modal -->
+    <div class="modal fade" id="customerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user me-2"></i>
+                        <span id="customer-modal-title">Add New Customer</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="customer-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Customer Name *</label>
+                                    <input type="text" class="form-control" id="customer-name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Email Address *</label>
+                                    <input type="email" class="form-control" id="customer-email" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Phone Number *</label>
+                            <input type="tel" class="form-control" id="customer-phone" placeholder="+1 (555) 123-4567" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Address</label>
+                            <textarea class="form-control" rows="3" id="customer-address" placeholder="Enter customer address..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-save me-2"></i>
+                            <span id="customer-submit-text">Add Customer</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add modal for bill message copy/share -->
+    <div class="modal fade" id="billMessageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Bill to Customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea class="form-control" rows="8" readonly></textarea>
+                    <div class="mt-2 text-end">
+                        <button class="btn btn-primary" onclick="copyBillMessage()">Copy Message</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
