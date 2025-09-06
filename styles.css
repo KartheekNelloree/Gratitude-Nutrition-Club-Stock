@@ -20,7 +20,7 @@ body {
     left: 0;
     z-index: 1000;
     transition: var(--transition);
-    background: #198754 !important;
+    background: #198754 !important; /* Restored original Herbalife green */
     color: #fff;
     min-height: 100vh;
 }

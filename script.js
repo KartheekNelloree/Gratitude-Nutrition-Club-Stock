@@ -1289,6 +1289,7 @@ function handleSaleSubmit(e) {
     renderProducts();
     renderDashboard();
     renderSalesForm();
+    renderPurchaseForm(); // Ensure purchase form updates after sale
     showAlert('Sale completed and invoice generated!', 'success');
     generateSaleInvoice(sale);
 }
