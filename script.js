@@ -662,8 +662,8 @@ function editProduct(id) {
     // Fill form
     document.getElementById('product-name').value = product.name;
     document.getElementById('product-category').value = product.category;
-    document.getElementById('product-price').value = product.price;
-    document.getElementById('product-cost').value = product.cost;
+    document.getElementById('product-volume-points').value = product.volumePoints || '';
+    document.getElementById('product-mrp').value = product.mrp || '';
     document.getElementById('product-stock').value = product.stock;
     document.getElementById('product-min-stock').value = product.minStock;
     document.getElementById('product-description').value = product.description;
