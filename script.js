@@ -689,8 +689,8 @@ function handleProductSubmit(e) {
     const formData = {
         name: document.getElementById('product-name').value.trim(),
         category: document.getElementById('product-category').value,
-        price: parseFloat(document.getElementById('product-price').value),
-        cost: parseFloat(document.getElementById('product-cost').value),
+        volumePoints: parseFloat(document.getElementById('product-volume-points').value),
+        mrp: parseFloat(document.getElementById('product-mrp').value),
         stock: parseInt(document.getElementById('product-stock').value),
         minStock: parseInt(document.getElementById('product-min-stock').value),
         discount: parseFloat(document.getElementById('product-discount').value) || 0,
