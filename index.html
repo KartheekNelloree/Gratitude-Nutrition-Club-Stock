@@ -53,10 +53,15 @@
             <div id="dashboard" class="content-section p-4">
                 <div class="d-flex align-items-center justify-content-between mb-4">
                     <h2 class="mb-0 text-success fw-bold">Dashboard</h2>
-                    <small class="text-muted">
-                        <i class="fas fa-clock me-1"></i>
-                        Last updated: <span id="last-updated"></span>
-                    </small>
+                    <div>
+                        <button class="btn btn-danger btn-sm me-3" onclick="clearAllData()">
+                            <i class="fas fa-trash me-1"></i> Clear All Data
+                        </button>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            Last updated: <span id="last-updated"></span>
+                        </small>
+                    </div>
                 </div>
 
                 <div class="row" id="dashboard-stats">
@@ -65,6 +70,17 @@
 
                 <div class="row mt-4">
                     <div class="col-md-8">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-calendar-day me-2"></i>
+                                    Daily Sales Report
+                                </h5>
+                            </div>
+                            <div class="card-body" id="daily-sales-report">
+                                <!-- Daily sales report will be populated by JavaScript -->
+                            </div>
+                        </div>
                         <div class="card shadow-sm">
                             <div class="card-header bg-primary text-white">
                                 <h5 class="mb-0">
@@ -429,30 +445,57 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Selling Price (₹) *</label>
+                                    <label class="form-label fw-bold">Base Price (₹) *</label>
                                     <input type="number" step="0.01" class="form-control" id="product-price" required>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Cost Price (₹) *</label>
                                     <input type="number" step="0.01" class="form-control" id="product-cost" required>
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Price Tiers (%)</label>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">25%</span>
+                                        <input type="number" step="0.01" class="form-control" id="product-price-25" placeholder="Price for 25%" required>
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">35%</span>
+                                        <input type="number" step="0.01" class="form-control" id="product-price-35" placeholder="Price for 35%" required>
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">42%</span>
+                                        <input type="number" step="0.01" class="form-control" id="product-price-42" placeholder="Price for 42%" required>
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">50%</span>
+                                        <input type="number" step="0.01" class="form-control" id="product-price-50" placeholder="Price for 50%" required>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Current Stock *</label>
                                     <input type="number" class="form-control" id="product-stock" required>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Minimum Stock *</label>
                                     <input type="number" class="form-control" id="product-min-stock" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Default Discount (%)</label>
+                                    <input type="number" class="form-control" id="product-discount" min="0" max="100" value="50">
                                 </div>
                             </div>
                         </div>
@@ -507,6 +550,10 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">Address</label>
                             <textarea class="form-control" rows="3" id="customer-address" placeholder="Enter customer address..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Discount (%)</label>
+                            <input type="number" class="form-control" id="customer-discount" min="0" max="100" value="0">
                         </div>
                     </div>
                     <div class="modal-footer">

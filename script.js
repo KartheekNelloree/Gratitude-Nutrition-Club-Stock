@@ -297,6 +297,29 @@ function renderDashboard() {
     renderDashboardStats(stats);
     renderQuickOverview(stats);
     renderLowStockAlert(stats);
+    // Daily Sales Report
+    const today = new Date().toISOString().slice(0, 10);
+    const todaysSales = sales.filter(sale => sale.date.slice(0, 10) === today);
+    let reportHtml = '';
+    if (todaysSales.length === 0) {
+        reportHtml = '<div class="text-muted">No sales recorded today.</div>';
+    } else {
+        reportHtml = `<table class="table table-bordered">
+            <thead><tr><th>Time</th><th>Customer</th><th>Products</th><th>Total (₹)</th><th>Discount (%)</th></tr></thead><tbody>`;
+        todaysSales.forEach(sale => {
+            const time = new Date(sale.date).toLocaleTimeString();
+            const customer = sale.customerName;
+            const products = sale.items.map(i => i.productName + ' x' + i.quantity).join(', ');
+            const total = sale.total.toFixed(2);
+            const discount = (() => {
+                const cust = customers.find(c => c.id === sale.customerId);
+                return cust ? (cust.discount || 0) : 0;
+            })();
+            reportHtml += `<tr><td>${time}</td><td>${customer}</td><td>${products}</td><td>₹${total}</td><td>${discount}%</td></tr>`;
+        });
+        reportHtml += '</tbody></table>';
+    }
+    document.getElementById('daily-sales-report').innerHTML = reportHtml;
     updateLastUpdated();
 }
 
@@ -456,6 +479,7 @@ function renderLowStockAlert(stats) {
 }
 
 // PRODUCT FUNCTIONS
+// Fix for Stock Reports visibility
 function renderProducts() {
     const tbody = document.getElementById('products-table');
     const productCount = document.getElementById('product-count');
@@ -479,22 +503,24 @@ function renderProducts() {
     
     tbody.innerHTML = products.map(product => {
         const status = getStockStatus(product);
-        const margin = ((product.price - product.cost) / product.price * 100);
-        
+        // Defensive: Ensure price and cost are numbers
+        const price = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
+        const cost = typeof product.cost === 'number' && !isNaN(product.cost) ? product.cost : 0;
+        const margin = price !== 0 ? ((price - cost) / price * 100) : 0;
         return `
             <tr>
                 <td>
-                    <div class="fw-bold">${product.name}</div>
-                    <small class="text-muted">${product.description}</small>
+                    <div class="fw-bold">${product.name || ''}</div>
+                    <small class="text-muted">${product.description || ''}</small>
                 </td>
                 <td>
-                    <span class="badge bg-secondary">${product.category}</span>
+                    <span class="badge bg-secondary">${product.category || ''}</span>
                 </td>
-                <td class="fw-bold text-success">₹${product.price.toFixed(2)}</td>
-                <td>₹${product.cost.toFixed(2)}</td>
+                <td class="fw-bold text-success">₹${price.toFixed(2)}</td>
+                <td>₹${cost.toFixed(2)}</td>
                 <td>
-                    <span class="fw-bold">${product.stock}</span>
-                    <small class="text-muted"> / ${product.minStock} min</small>
+                    <span class="fw-bold">${product.stock || 0}</span>
+                    <small class="text-muted"> / ${product.minStock || 0} min</small>
                 </td>
                 <td>
                     <span class="status-dot ${status.dotClass}"></span>
@@ -667,6 +693,13 @@ function handleProductSubmit(e) {
         cost: parseFloat(document.getElementById('product-cost').value),
         stock: parseInt(document.getElementById('product-stock').value),
         minStock: parseInt(document.getElementById('product-min-stock').value),
+        discount: parseFloat(document.getElementById('product-discount').value) || 0,
+        priceTiers: {
+            '25': parseFloat(document.getElementById('product-price-25').value),
+            '35': parseFloat(document.getElementById('product-price-35').value),
+            '42': parseFloat(document.getElementById('product-price-42').value),
+            '50': parseFloat(document.getElementById('product-price-50').value)
+        },
         description: document.getElementById('product-description').value.trim()
     };
     
@@ -873,7 +906,8 @@ function handleCustomerSubmit(e) {
         name: document.getElementById('customer-name').value.trim(),
         email: document.getElementById('customer-email').value.trim(),
         phone: document.getElementById('customer-phone').value.trim(),
-        address: document.getElementById('customer-address').value.trim()
+        address: document.getElementById('customer-address').value.trim(),
+        discount: parseFloat(document.getElementById('customer-discount').value) || 0
     };
     
     if (currentEditingCustomer) {
@@ -947,7 +981,18 @@ function renderSaleItems() {
             </div>
             <div class="col-md-2">
                 <label class="form-label fw-bold">Price</label>
-                <input type="number" step="0.01" class="form-control" value="${item.price}" onchange="updateSaleItem(${index}, 'price', parseFloat(this.value) || 0)" required>
+                <input type="number" step="0.01" class="form-control mb-1" value="${item.price}" onchange="updateSaleItem(${index}, 'price', parseFloat(this.value) || 0)" required>
+                <div class="small text-muted">
+                    ${(() => {
+                        const product = products.find(p => p.id === item.productId);
+                        if (product && product.priceTiers) {
+                            return Object.entries(product.priceTiers).map(([tier, price]) => `
+                                <span class='badge bg-secondary me-1'>${tier}%: ₹${price.toFixed(2)}</span>
+                            `).join('');
+                        }
+                        return '';
+                    })()}
+                </div>
             </div>
             <div class="col-md-2">
                 <label class="form-label fw-bold">Total</label>
@@ -974,7 +1019,7 @@ function renderSaleCustomerDropdown() {
     select.innerHTML = `
         <option value="">Select Customer</option>
         ${customers.map(customer => `
-            <option value="${customer.id}">${customer.name}</option>
+            <option value="${customer.id}">${customer.name} (${customer.discount || 0}% off)</option>
         `).join('')}
     `;
     
@@ -991,6 +1036,8 @@ function renderSaleCustomerDropdown() {
                     <small class="text-muted">${customer.email}</small>
                     <br>
                     <small class="text-muted">${customer.phone}</small>
+                    <br>
+                    <span class="badge bg-success">Discount: ${customer.discount || 0}%</span>
                 `;
                 customerInfo.style.display = 'block';
             }
@@ -1152,11 +1199,34 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
     doc.setFont('helvetica', 'normal');
     
     sale.items.forEach(item => {
+        // Find customer discount
+        const customer = customers.find(c => c.id === sale.customerId);
+        const discount = customer ? customer.discount || 0 : 0;
+        // Remove any unwanted superscript or small '1' by using Unicode normalization and plain string
+        const priceText = `₹${item.price.toFixed(2)}`.normalize('NFKC').replace(/[^\d₹.]/g, '');
+        const totalText = `₹${item.total.toFixed(2)}`.normalize('NFKC').replace(/[^\d₹.]/g, '');
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
         doc.text(item.productName.substring(0, 25), 20, y);
-        doc.text(item.quantity.toString(), 120, y);
-        doc.text(`₹${item.price.toFixed(2)}`, 140, y);
-        doc.text(`₹${item.total.toFixed(2)}`, 170, y);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(item.quantity), 120, y);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(priceText, 140, y);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(totalText, 170, y);
         y += 10;
+        // Only show discount info if discount > 0
+        if (discount > 0) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Discount Applied: ${discount}%`, 20, y);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            y += 8;
+        }
     });
     
     // Totals
@@ -1167,9 +1237,7 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
     doc.text(`Total: ₹${sale.total.toFixed(2)}`, 140, y);
     
     // Footer
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Thank you for your business!', 20, 280);
+    // Removed 'Thank you for your business!' from invoice footer
     
     // Save PDF and send via WhatsApp
     const pdfFileName = `sale-invoice-${sale.id}.pdf`;
@@ -1180,6 +1248,91 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
         window.open(whatsappUrl, '_blank');
         // Optionally, send PDF via email (requires backend)
     }
+}
+
+// PURCHASE FUNCTIONS
+function renderPurchaseForm() {
+    const container = document.getElementById('purchase-items-container');
+    if (!container) return;
+    // Simple purchase item row for demonstration
+    container.innerHTML = `
+        <div class="row mb-3 align-items-end border-bottom pb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Product Name</label>
+                <input type="text" class="form-control" id="purchase-product-name" placeholder="Enter product name" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Quantity</label>
+                <input type="number" class="form-control" id="purchase-product-qty" min="1" value="1" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Cost Price (₹)</label>
+                <input type="number" class="form-control" id="purchase-product-cost" min="0" step="0.01" required>
+            </div>
+        </div>
+    `;
+}
+
+function handlePurchaseSubmit(e) {
+    e.preventDefault();
+    // Get purchase details from form
+    const productName = document.getElementById('purchase-product-name').value.trim();
+    const quantity = parseInt(document.getElementById('purchase-product-qty').value);
+    const cost = parseFloat(document.getElementById('purchase-product-cost').value);
+    const supplier = document.getElementById('purchase-supplier').value.trim();
+    if (!productName || !quantity || !cost || !supplier) {
+        showAlert('Please fill all purchase fields.', 'danger');
+        return;
+    }
+    // Create purchase object
+    const purchase = {
+        id: generateId(),
+        productName,
+        quantity,
+        cost,
+        supplier,
+        date: new Date().toISOString(),
+        total: quantity * cost
+    };
+    purchases.push(purchase);
+    saveToStorage('herbalife_purchases', purchases);
+    renderDashboard();
+    showAlert('Purchase completed and invoice generated!', 'success');
+    generatePurchaseInvoice(purchase);
+    document.getElementById('purchase-form').reset();
+}
+
+function generatePurchaseInvoice(purchase) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Gratitude Nutrition Club', 20, 30);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Purchase Invoice', 20, 45);
+    doc.setFontSize(10);
+    doc.text(`Invoice #: ${purchase.id}`, 120, 30);
+    doc.text(`Date: ${new Date(purchase.date).toLocaleDateString()}`, 120, 40);
+    doc.text(`Supplier: ${purchase.supplier}`, 120, 50);
+    let y = 70;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Product', 20, y);
+    doc.text('Qty', 120, y);
+    doc.text('Cost', 140, y);
+    doc.text('Total', 170, y);
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.text(purchase.productName.substring(0, 25), 20, y);
+    doc.text(String(purchase.quantity), 120, y);
+    doc.text(`₹${purchase.cost.toFixed(2)}`, 140, y);
+    doc.text(`₹${purchase.total.toFixed(2)}`, 170, y);
+    y += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total: ₹${purchase.total.toFixed(2)}`, 140, y);
+    // Removed 'Thank you for your business!' from invoice footer
+    const pdfFileName = `purchase-invoice-${purchase.id}.pdf`;
+    doc.save(pdfFileName);
 }
 
 // Set active dashboard tab on load
@@ -1205,7 +1358,7 @@ function clearAllData() {
     renderDashboard();
     renderSalesForm();
     renderPurchaseForm();
-    showAlert('All products, customers, sales, and purchases have been deleted.', 'success');
+    showAlert('All products, customers, sales, and purchases have been deleted. You can now add new data.', 'success');
 }
 
 // Call clearAllData() from the console or add a button to trigger it.
@@ -1292,4 +1445,27 @@ function handleSaleSubmit(e) {
     renderPurchaseForm(); // Ensure purchase form updates after sale
     showAlert('Sale completed and invoice generated!', 'success');
     generateSaleInvoice(sale);
+}
+
+// REPORTS FUNCTIONS
+function renderReports() {
+    const tbody = document.getElementById('reports-table');
+    if (!tbody) return;
+    let filteredProducts = products;
+    const filter = document.querySelector('input[name="report-filter"]:checked')?.value || 'all';
+    if (filter === 'low') {
+        filteredProducts = products.filter(p => p.stock <= p.minStock);
+    } else if (filter === 'out') {
+        filteredProducts = products.filter(p => p.stock === 0);
+    }
+    if (filteredProducts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="empty-state"><i class="fas fa-box fa-3x text-muted mb-3"></i><p class="text-muted">No products found for this report.</p></div></td></tr>`;
+        return;
+    }
+    tbody.innerHTML = filteredProducts.map(product => {
+        const status = getStockStatus(product);
+        const price = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
+        const cost = typeof product.cost === 'number' && !isNaN(product.cost) ? product.cost : 0;
+        return `<tr><td>${product.name || ''}</td><td>${product.category || ''}</td><td>${product.stock || 0}</td><td>${product.minStock || 0}</td><td>₹${(price * product.stock).toFixed(2)}</td><td><span class="status-dot ${status.dotClass}"></span><span class="badge ${status.badgeClass}">${status.text}</span></td></tr>`;
+    }).join('');
 }
