@@ -327,7 +327,7 @@ function calculateStats() {
     const totalProducts = products.length;
     const totalCustomers = customers.length;
     const lowStockProducts = products.filter(p => p.stock <= p.minStock);
-    const totalInventoryValue = products.reduce((sum, p) => sum + (p.stock * p.cost), 0);
+    const totalInventoryValue = products.reduce((sum, p) => sum + (p.stock * (p.mrp || 0)), 0);
     const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
     const productsInStock = products.filter(p => p.stock > 0).length;
     
@@ -501,49 +501,38 @@ function renderProducts() {
     
     productCount.textContent = products.length;
     
-    tbody.innerHTML = products.map(product => {
-        const status = getStockStatus(product);
-        // Defensive: Ensure price and cost are numbers
-        const price = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
-        const cost = typeof product.cost === 'number' && !isNaN(product.cost) ? product.cost : 0;
-        const margin = price !== 0 ? ((price - cost) / price * 100) : 0;
-        return `
-            <tr>
-                <td>
-                    <div class="fw-bold">${product.name || ''}</div>
-                    <small class="text-muted">${product.description || ''}</small>
-                </td>
-                <td>
-                    <span class="badge bg-secondary">${product.category || ''}</span>
-                </td>
-                <td class="fw-bold text-success">₹${price.toFixed(2)}</td>
-                <td>₹${cost.toFixed(2)}</td>
-                <td>
-                    <span class="fw-bold">${product.stock || 0}</span>
-                    <small class="text-muted"> / ${product.minStock || 0} min</small>
-                </td>
-                <td>
-                    <span class="status-dot ${status.dotClass}"></span>
-                    <span class="badge ${status.badgeClass}">${status.text}</span>
-                </td>
-                <td>
-                    <span class="fw-bold ${margin > 50 ? 'text-success' : margin > 30 ? 'text-warning' : 'text-danger'}">
-                        ${margin.toFixed(1)}%
-                    </span>
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" title="Edit Product">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" title="Delete Product">
-                            <i class="fas fa-trash"></i>
-                        </button>
+    tbody.innerHTML = products.map(product => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                        <i class="fas fa-box"></i>
                     </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+                    <div class="fw-bold">${product.name}</div>
+                </div>
+            </td>
+            <td>${product.category}</td>
+            <td class="fw-bold text-primary">₹${(product.mrp || 0).toFixed(2)}</td>
+            <td class="fw-bold text-success">₹${(product.priceTiers && product.priceTiers['50'] ? product.priceTiers['50'] : 0).toFixed(2)}</td>
+            <td>${product.stock}</td>
+            <td>
+                <span class="badge ${getStockStatus(product).badgeClass}">${getStockStatus(product).text}</span>
+            </td>
+            <td>
+                <span class="badge bg-info">${product.mrp && product.priceTiers && product.priceTiers['50'] ? (((product.mrp - product.priceTiers['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" title="Edit Product">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" title="Delete Product">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
 }
 
 function getStockStatus(product) {
@@ -595,47 +584,38 @@ function filterProducts() {
     
     productCount.textContent = filteredProducts.length;
     
-    tbody.innerHTML = filteredProducts.map(product => {
-        const status = getStockStatus(product);
-        const margin = ((product.price - product.cost) / product.price * 100);
-        
-        return `
-            <tr>
-                <td>
-                    <div class="fw-bold">${product.name}</div>
-                    <small class="text-muted">${product.description}</small>
-                </td>
-                <td>
-                    <span class="badge bg-secondary">${product.category}</span>
-                </td>
-                <td class="fw-bold text-success">₹${product.price.toFixed(2)}</td>
-                <td>₹${product.cost.toFixed(2)}</td>
-                <td>
-                    <span class="fw-bold">${product.stock}</span>
-                    <small class="text-muted"> / ${product.minStock} min</small>
-                </td>
-                <td>
-                    <span class="status-dot ${status.dotClass}"></span>
-                    <span class="badge ${status.badgeClass}">${status.text}</span>
-                </td>
-                <td>
-                    <span class="fw-bold ${margin > 50 ? 'text-success' : margin > 30 ? 'text-warning' : 'text-danger'}">
-                        ${margin.toFixed(1)}%
-                    </span>
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" title="Edit Product">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" title="Delete Product">
-                            <i class="fas fa-trash"></i>
-                        </button>
+    tbody.innerHTML = filteredProducts.map(product => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                        <i class="fas fa-box"></i>
                     </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+                    <div class="fw-bold">${product.name}</div>
+                </div>
+            </td>
+            <td>${product.category}</td>
+            <td class="fw-bold text-primary">₹${(product.mrp || 0).toFixed(2)}</td>
+            <td class="fw-bold text-success">₹${(product.priceTiers && product.priceTiers['50'] ? product.priceTiers['50'] : 0).toFixed(2)}</td>
+            <td>${product.stock}</td>
+            <td>
+                <span class="badge ${getStockStatus(product).badgeClass}">${getStockStatus(product).text}</span>
+            </td>
+            <td>
+                <span class="badge bg-info">${product.mrp && product.priceTiers && product.priceTiers['50'] ? (((product.mrp - product.priceTiers['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" title="Edit Product">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" title="Delete Product">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
 }
 
 function openProductModal() {
@@ -1108,6 +1088,7 @@ function updateSaleItemQuantity(index, change) {
 // Fix: Always update order summary amount for billing
 function updateSaleTotal() {
     let subtotal = 0;
+    let totalVP = 0;
     saleItems.forEach(item => {
         // Auto-fill price if product selected and price is zero
         if (item.productId && item.price === 0) {
@@ -1118,9 +1099,16 @@ function updateSaleTotal() {
         }
         item.total = item.quantity * item.price;
         subtotal += item.total;
+        // Calculate total volume points
+        const product = products.find(p => p.id === item.productId);
+        if (product && product.volumePoints) {
+            totalVP += item.quantity * product.volumePoints;
+        }
     });
     document.getElementById('sale-subtotal').textContent = `₹${subtotal.toFixed(2)}`;
     document.getElementById('sale-total').textContent = `₹${subtotal.toFixed(2)}`;
+    const vpElem = document.getElementById('sale-total-vp');
+    if (vpElem) vpElem.textContent = totalVP.toFixed(2);
 }
 
 function updateSaleSubmitButton() {
@@ -1464,12 +1452,15 @@ function renderReports() {
     }
     if (filteredProducts.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="empty-state"><i class="fas fa-box fa-3x text-muted mb-3"></i><p class="text-muted">No products found for this report.</p></div></td></tr>`;
+        document.getElementById('stock-total-vp').textContent = '0';
         return;
     }
+    let totalVP = 0;
     tbody.innerHTML = filteredProducts.map(product => {
         const status = getStockStatus(product);
-        const price = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
-        const cost = typeof product.cost === 'number' && !isNaN(product.cost) ? product.cost : 0;
+        const price = typeof product.mrp === 'number' && !isNaN(product.mrp) ? product.mrp : 0;
+        totalVP += (product.volumePoints || 0) * (product.stock || 0);
         return `<tr><td>${product.name || ''}</td><td>${product.category || ''}</td><td>${product.stock || 0}</td><td>${product.minStock || 0}</td><td>₹${(price * product.stock).toFixed(2)}</td><td><span class="status-dot ${status.dotClass}"></span><span class="badge ${status.badgeClass}">${status.text}</span></td></tr>`;
     }).join('');
+    document.getElementById('stock-total-vp').textContent = totalVP.toFixed(2);
 }
