@@ -959,8 +959,8 @@ function renderSaleItems() {
     const container = document.getElementById('sale-items-container');
     
     container.innerHTML = saleItems.map((item, index) => `
-        <div class="row mb-3 align-items-end border-bottom pb-3" data-item-id="${item.id}">
-            <div class="col-md-4">
+        <div class="row mb-3 align-items-center border-bottom pb-3 gx-2" data-item-id="${item.id}">
+            <div class="col-lg-3 col-md-4 col-12">
                 <label class="form-label fw-bold">Product</label>
                 <select class="form-select" onchange="updateSaleItem(${index}, 'productId', this.value)" required>
                     <option value="">Select Product</option>
@@ -971,35 +971,39 @@ function renderSaleItems() {
                     `).join('')}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-lg-2 col-md-2 col-6">
                 <label class="form-label fw-bold">Quantity</label>
-                <div class="qty-control">
-                    <button type="button" onclick="updateSaleItemQuantity(${index}, -1)">-</button>
-                    <input type="number" value="${item.quantity}" min="1" onchange="updateSaleItem(${index}, 'quantity', parseInt(this.value) || 1)">
-                    <button type="button" onclick="updateSaleItemQuantity(${index}, 1)">+</button>
+                <div class="qty-control d-flex align-items-center gap-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="updateSaleItemQuantity(${index}, -1)">-</button>
+                    <input type="number" class="form-control form-control-sm" value="${item.quantity}" min="1" onchange="updateSaleItem(${index}, 'quantity', parseInt(this.value) || 1)">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="updateSaleItemQuantity(${index}, 1)">+</button>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-lg-3 col-md-3 col-12">
                 <label class="form-label fw-bold">Price</label>
                 <input type="number" step="0.01" class="form-control mb-1" value="${item.price}" onchange="updateSaleItem(${index}, 'price', parseFloat(this.value) || 0)" required>
-                <div class="small text-muted">
+                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap w-100" style="flex-wrap:wrap;">
                     ${(() => {
                         const product = products.find(p => p.id === item.productId);
                         if (product && product.priceTiers) {
-                            return Object.entries(product.priceTiers).map(([tier, price]) => `
-                                <span class='badge bg-secondary me-1'>${tier}%: ₹${price.toFixed(2)}</span>
-                            `).join('');
+                            return `<div class='btn-group mb-2' role='group' aria-label='Price Tiers' style='flex-wrap:wrap;'>` +
+                                Object.entries(product.priceTiers).map(([tier, price]) => `
+                                    <button type="button" class="btn btn-light border btn-sm px-2 mb-1 me-1" title="Apply ${tier}% price" onclick="updateSaleItem(${index}, 'price', ${price})">
+                                        <span class="fw-bold text-success">${tier}%</span><br>
+                                        <span class="text-muted" style="font-size:13px;">₹${price.toFixed(2)}</span>
+                                    </button>
+                                `).join('') + '</div>';
                         }
                         return '';
                     })()}
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-lg-2 col-md-2 col-6">
                 <label class="form-label fw-bold">Total</label>
-                <div class="form-control bg-light fw-bold text-success">₹${item.total.toFixed(2)}</div>
+                <div class="form-control bg-light fw-bold text-success mb-2" style="text-align:right; font-size:1.1em; width:100%; box-sizing:border-box;">₹${item.total.toFixed(2)}</div>
             </div>
-            <div class="col-md-2">
-                <div class="btn-group">
+            <div class="col-lg-2 col-md-1 col-12">
+                <div class="btn-group mt-3 mt-md-0">
                     <button type="button" class="btn btn-success btn-sm" onclick="addSaleItem()">
                         <i class="fas fa-plus"></i>
                     </button>
