@@ -1049,8 +1049,19 @@ function removeSaleItem(index) {
 function updateSaleItem(index, field, value) {
     if (!saleItems[index]) return;
     
+    // Prevent adding more than available stock
+    if (field === 'quantity') {
+        const product = products.find(p => p.id === saleItems[index].productId);
+        if (product && value > product.stock) {
+            showAlert(`Insufficient stock for ${product.name}. Available: ${product.stock}`, 'danger');
+            return; // Do not update quantity
+        }
+        // Auto-fill price from product default if not set
+        if (product && (!saleItems[index].price || saleItems[index].price === 0)) {
+            saleItems[index].price = product.price;
+        }
+    }
     saleItems[index][field] = value;
-    
     if (field === 'productId') {
         const product = products.find(p => p.id === value);
         if (product) {
@@ -1061,7 +1072,6 @@ function updateSaleItem(index, field, value) {
     } else if (field === 'quantity' || field === 'price') {
         saleItems[index].total = saleItems[index].quantity * saleItems[index].price;
     }
-    
     renderSaleItems();
     updateSaleTotal();
     updateSaleSubmitButton();
