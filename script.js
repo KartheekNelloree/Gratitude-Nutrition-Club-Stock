@@ -1,3 +1,61 @@
+// Stub to prevent ReferenceError for renderPurchaseForm
+function renderPurchaseForm() {
+    // Render purchase items from products in stock
+    const container = document.getElementById('purchase-items-container');
+    if (!container) return;
+    if (products.length === 0) {
+        container.innerHTML = '<div class="text-muted">No products available for purchase.</div>';
+        return;
+    }
+    // Default: one purchase item row
+    if (purchaseItems.length === 0) {
+        purchaseItems = [{ id: Date.now(), productId: '', quantity: 1, price: 0 }];
+    }
+    container.innerHTML = purchaseItems.map((item, index) => {
+        return `
+        <div class="row mb-3 align-items-center gx-2" data-item-id="${item.id}">
+            <div class="col-lg-5 col-md-6 col-12">
+                <label class="form-label fw-bold">Product</label>
+                <select class="form-select" onchange="updatePurchaseItem(${index}, 'productId', this.value)" required>
+                    <option value="">Select Product</option>
+                    ${products.map(product => `<option value="${product.id}" ${item.productId === product.id ? 'selected' : ''}>${product.name} (Stock: ${product.stock})</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-2 col-6">
+                <label class="form-label fw-bold">Quantity</label>
+                <input type="number" class="form-control" min="1" value="${item.quantity}" onchange="updatePurchaseItem(${index}, 'quantity', parseInt(this.value) || 1)">
+            </div>
+            <div class="col-lg-3 col-md-2 col-6">
+                <label class="form-label fw-bold">Price</label>
+                <input type="number" class="form-control" min="0" step="0.01" value="${item.price}" onchange="updatePurchaseItem(${index}, 'price', parseFloat(this.value) || 0)">
+            </div>
+            <div class="col-lg-2 col-md-2 col-12">
+                <label class="form-label fw-bold">Total</label>
+                <div class="form-control bg-light fw-bold text-success" style="text-align:right;">Rs. ${(item.quantity * item.price).toFixed(2)}</div>
+            </div>
+        </div>
+        `;
+    }).join('');
+
+// Update purchase item fields
+function updatePurchaseItem(index, field, value) {
+    if (!purchaseItems[index]) return;
+    purchaseItems[index][field] = value;
+    renderPurchaseForm();
+    updatePurchaseSummary();
+}
+
+// Update purchase summary
+function updatePurchaseSummary() {
+    const subtotal = purchaseItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        document.getElementById('purchase-subtotal').textContent = `Rs. ${subtotal.toFixed(2)}`;
+    document.getElementById('purchase-total').textContent = `Rs. ${subtotal.toFixed(2)}`;
+    // Enable purchase button only if all items are valid
+    const button = document.getElementById('complete-purchase-btn');
+    const valid = purchaseItems.every(item => item.productId && item.quantity > 0 && item.price > 0);
+    button.disabled = !valid;
+}
+}
 // Herbalife Inventory Management System - JavaScript
 
 // Global variables
@@ -36,6 +94,26 @@ function initializeApp() {
     
     // Load data from localStorage
     products = getFromStorage('herbalife_products', []);
+    // Migrate any products with global/shared priceTiers to per-product priceTiers
+    products.forEach(product => {
+        // If product has prices, do nothing
+        if (product.prices) return;
+        // If product has priceTiers, migrate to prices
+        if (product.priceTiers) {
+            product.prices = { ...product.priceTiers };
+            delete product.priceTiers;
+        }
+        // If neither, initialize prices from MRP
+        if (!product.prices) {
+            product.prices = {
+                '25': product.mrp ? product.mrp * 0.75 : 0,
+                '35': product.mrp ? product.mrp * 0.65 : 0,
+                '42': product.mrp ? product.mrp * 0.58 : 0,
+                '50': product.mrp ? product.mrp * 0.50 : 0
+            };
+        }
+    });
+    saveToStorage('herbalife_products', products);
     customers = getFromStorage('herbalife_customers', []);
     sales = getFromStorage('herbalife_sales', []);
     purchases = getFromStorage('herbalife_purchases', []);
@@ -513,13 +591,13 @@ function renderProducts() {
             </td>
             <td>${product.category}</td>
             <td class="fw-bold text-primary">₹${(product.mrp || 0).toFixed(2)}</td>
-            <td class="fw-bold text-success">₹${(product.priceTiers && product.priceTiers['50'] ? product.priceTiers['50'] : 0).toFixed(2)}</td>
+            <td class="fw-bold text-success">₹${product.prices && product.prices['50'] ? product.prices['50'].toFixed(2) : '0.00'}</td>
             <td>${product.stock}</td>
             <td>
                 <span class="badge ${getStockStatus(product).badgeClass}">${getStockStatus(product).text}</span>
             </td>
             <td>
-                <span class="badge bg-info">${product.mrp && product.priceTiers && product.priceTiers['50'] ? (((product.mrp - product.priceTiers['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
+                <span class="badge bg-info">${product.mrp && product.prices && product.prices['50'] ? (((product.mrp - product.prices['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
             </td>
             <td>
                 <div class="btn-group btn-group-sm">
@@ -596,13 +674,13 @@ function filterProducts() {
             </td>
             <td>${product.category}</td>
             <td class="fw-bold text-primary">₹${(product.mrp || 0).toFixed(2)}</td>
-            <td class="fw-bold text-success">₹${(product.priceTiers && product.priceTiers['50'] ? product.priceTiers['50'] : 0).toFixed(2)}</td>
+            <td class="fw-bold text-success">₹${(product.prices && product.prices['50'] ? product.prices['50'] : 0).toFixed(2)}</td>
             <td>${product.stock}</td>
             <td>
                 <span class="badge ${getStockStatus(product).badgeClass}">${getStockStatus(product).text}</span>
             </td>
             <td>
-                <span class="badge bg-info">${product.mrp && product.priceTiers && product.priceTiers['50'] ? (((product.mrp - product.priceTiers['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
+                <span class="badge bg-info">${product.mrp && product.prices && product.prices['50'] ? (((product.mrp - product.prices['50']) / product.mrp) * 100).toFixed(1) : '0.0'}%</span>
             </td>
             <td>
                 <div class="btn-group btn-group-sm">
@@ -625,6 +703,11 @@ function openProductModal() {
     
     // Reset form
     document.getElementById('product-form').reset();
+    // Reset price tiers fields to blank
+    document.getElementById('product-price-25').value = '';
+    document.getElementById('product-price-35').value = '';
+    document.getElementById('product-price-42').value = '';
+    document.getElementById('product-price-50').value = '';
     
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('productModal'));
@@ -647,6 +730,11 @@ function editProduct(id) {
     document.getElementById('product-stock').value = product.stock;
     document.getElementById('product-min-stock').value = product.minStock;
     document.getElementById('product-description').value = product.description;
+    // Bind price tiers for this product only
+    document.getElementById('product-price-25').value = product.prices && product.prices['25'] ? product.prices['25'] : '';
+    document.getElementById('product-price-35').value = product.prices && product.prices['35'] ? product.prices['35'] : '';
+    document.getElementById('product-price-42').value = product.prices && product.prices['42'] ? product.prices['42'] : '';
+    document.getElementById('product-price-50').value = product.prices && product.prices['50'] ? product.prices['50'] : '';
     
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('productModal'));
@@ -674,7 +762,7 @@ function handleProductSubmit(e) {
         stock: parseInt(document.getElementById('product-stock').value),
         minStock: parseInt(document.getElementById('product-min-stock').value),
         discount: parseFloat(document.getElementById('product-discount').value) || 0,
-        priceTiers: {
+        prices: {
             '25': parseFloat(document.getElementById('product-price-25').value),
             '35': parseFloat(document.getElementById('product-price-35').value),
             '42': parseFloat(document.getElementById('product-price-42').value),
@@ -690,6 +778,7 @@ function handleProductSubmit(e) {
             products[index] = {
                 ...products[index],
                 ...formData,
+                prices: { ...formData.prices }, // ensure prices are unique per product
                 updatedAt: new Date().toISOString()
             };
         }
@@ -699,17 +788,17 @@ function handleProductSubmit(e) {
         const newProduct = {
             id: generateId(),
             ...formData,
+            prices: { ...formData.prices }, // ensure prices are unique per product
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
         products.push(newProduct);
         showAlert('Product added successfully!');
     }
-    
+    // Save all products with their own prices to localStorage
     saveToStorage('herbalife_products', products);
     renderProducts();
     renderDashboard();
-    
     // Close modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('productModal'));
     modal.hide();
@@ -927,7 +1016,7 @@ function handleCustomerSubmit(e) {
 function renderSalesForm() {
     // Initialize sale items if empty
     if (saleItems.length === 0) {
-        saleItems = [{ id: generateId(), productId: '', productName: '', quantity: 1, price: 0, total: 0 }];
+        saleItems = [{ id: generateId(), productId: '', productName: '', quantity: 1, price: 0, total: 0, discountTier: '50' }];
     }
     
     renderSaleItems();
@@ -938,7 +1027,15 @@ function renderSalesForm() {
 function renderSaleItems() {
     const container = document.getElementById('sale-items-container');
     
-    container.innerHTML = saleItems.map((item, index) => `
+    container.innerHTML = saleItems.map((item, index) => {
+        const product = products.find(p => p.id === item.productId);
+        // Discount selection (dropdown)
+        let discountOptions = '';
+        if (product && product.prices) {
+            discountOptions = `<select class="form-select form-select-sm w-auto d-inline-block ms-2" onchange="updateSaleItem(${index}, 'discountTier', this.value)">` +
+                ['25','35','42','50'].map(tier => `<option value="${tier}" ${item.discountTier === tier ? 'selected' : ''}>${tier}%</option>`).join('') + '</select>';
+        }
+        return `
         <div class="row mb-3 align-items-center border-bottom pb-3 gx-2" data-item-id="${item.id}">
             <div class="col-lg-3 col-md-4 col-12">
                 <label class="form-label fw-bold">Product</label>
@@ -950,6 +1047,7 @@ function renderSaleItems() {
                         </option>
                     `).join('')}
                 </select>
+                ${discountOptions}
             </div>
             <div class="col-lg-2 col-md-2 col-6">
                 <label class="form-label fw-bold">Quantity</label>
@@ -962,21 +1060,6 @@ function renderSaleItems() {
             <div class="col-lg-3 col-md-3 col-12">
                 <label class="form-label fw-bold">Price</label>
                 <input type="number" step="0.01" class="form-control mb-1" value="${item.price}" onchange="updateSaleItem(${index}, 'price', parseFloat(this.value) || 0)" required>
-                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap w-100" style="flex-wrap:wrap;">
-                    ${(() => {
-                        const product = products.find(p => p.id === item.productId);
-                        if (product && product.priceTiers) {
-                            return `<div class='btn-group mb-2' role='group' aria-label='Price Tiers' style='flex-wrap:wrap;'>` +
-                                Object.entries(product.priceTiers).map(([tier, price]) => `
-                                    <button type="button" class="btn btn-light border btn-sm px-2 mb-1 me-1" title="Apply ${tier}% price" onclick="updateSaleItem(${index}, 'price', ${price})">
-                                        <span class="fw-bold text-success">${tier}%</span><br>
-                                        <span class="text-muted" style="font-size:13px;">₹${price.toFixed(2)}</span>
-                                    </button>
-                                `).join('') + '</div>';
-                        }
-                        return '';
-                    })()}
-                </div>
             </div>
             <div class="col-lg-2 col-md-2 col-6">
                 <label class="form-label fw-bold">Total</label>
@@ -995,7 +1078,8 @@ function renderSaleItems() {
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function renderSaleCustomerDropdown() {
@@ -1034,7 +1118,7 @@ function renderSaleCustomerDropdown() {
 }
 
 function addSaleItem() {
-    saleItems.push({ id: generateId(), productId: '', productName: '', quantity: 1, price: 0, total: 0 });
+    saleItems.push({ id: generateId(), productId: '', productName: '', quantity: 1, price: 0, total: 0, discountTier: '50' });
     renderSaleItems();
 }
 
@@ -1056,9 +1140,11 @@ function updateSaleItem(index, field, value) {
             showAlert(`Insufficient stock for ${product.name}. Available: ${product.stock}`, 'danger');
             return; // Do not update quantity
         }
-        // Auto-fill price from product default if not set
+        // Auto-fill price from product default if not set, for this sale item only
         if (product && (!saleItems[index].price || saleItems[index].price === 0)) {
-            saleItems[index].price = product.price;
+            // Use selected discount tier if set
+            const tier = saleItems[index].discountTier || '50';
+            saleItems[index].price = product.prices && product.prices[tier] ? product.prices[tier] : (product.mrp || 0);
         }
     }
     saleItems[index][field] = value;
@@ -1066,10 +1152,22 @@ function updateSaleItem(index, field, value) {
         const product = products.find(p => p.id === value);
         if (product) {
             saleItems[index].productName = product.name;
-            saleItems[index].price = product.price;
-            saleItems[index].total = saleItems[index].quantity * product.price;
+            // Set price for this product only, use selected discount tier if set
+            const tier = saleItems[index].discountTier || '50';
+            saleItems[index].price = product.prices && product.prices[tier] ? product.prices[tier] : (product.mrp || 0);
+            saleItems[index].total = saleItems[index].quantity * saleItems[index].price;
         }
-    } else if (field === 'quantity' || field === 'price') {
+    } else if (field === 'discountTier') {
+        // When discount tier changes, update price for this sale item only
+        const product = products.find(p => p.id === saleItems[index].productId);
+        if (product) {
+            saleItems[index].price = product.prices && product.prices[value] ? product.prices[value] : (product.mrp || 0);
+            saleItems[index].total = saleItems[index].quantity * saleItems[index].price;
+        }
+    } else if (field === 'price') {
+        saleItems[index].price = value;
+        saleItems[index].total = saleItems[index].quantity * saleItems[index].price;
+    } else if (field === 'quantity') {
         saleItems[index].total = saleItems[index].quantity * saleItems[index].price;
     }
     renderSaleItems();
@@ -1100,13 +1198,17 @@ function updateSaleTotal() {
     let subtotal = 0;
     let totalVP = 0;
     saleItems.forEach(item => {
-        // Auto-fill price if product selected and price is zero
-        if (item.productId && item.price === 0) {
+        // Always use the selected discount tier for each product
+        if (item.productId) {
             const product = products.find(p => p.id === item.productId);
-            if (product) {
-                item.price = product.price;
+            const tier = item.discountTier || '50';
+            if (product && product.prices && product.prices[tier]) {
+                item.price = product.prices[tier];
+            } else if (product && product.mrp) {
+                item.price = product.mrp;
             }
         }
+ 
         item.total = item.quantity * item.price;
         subtotal += item.total;
         // Calculate total volume points
@@ -1167,112 +1269,91 @@ function sendBillToCustomer() {
         tax: 0,
         total: saleItems.reduce((sum, item) => sum + item.total, 0)
     };
-    generateSaleInvoice(sale, true, customer.phone, billText);
+    try {
+        generateSaleInvoice(sale, true, customer.phone, billText);
+        showAlert('Sale completed and invoice downloaded!', 'success');
+    } catch (err) {
+        showAlert('Error generating invoice. Please check jsPDF and try again.', 'danger');
+        console.error('Invoice error:', err);
+    }
 }
 
 // Update generateSaleInvoice to support WhatsApp sharing
 function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = '') {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    // Header
-    doc.setFontSize(20);
+    // Helper for INR formatting
+    // Use 'Rs.' prefix to avoid font issues with ₹
+    const formatINR = (value) => `Rs. ${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Full-width header with big club name
+    doc.setFillColor(30, 30, 30);
+    doc.rect(0, 0, 210, 32, 'F');
+    doc.setFontSize(26);
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text(BILLING_NAME, 20, 30);
+    doc.text('Gratitude Nutrition Club', 105, 15, { align: 'center' });
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Sales Invoice', 20, 45);
-    
-    // Invoice details
-    doc.setFontSize(10);
-    doc.text(`Invoice #: ${sale.id}`, 120, 30);
-    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 120, 40);
-    doc.text(`Customer: ${sale.customerName}`, 120, 50);
-    
-    // Table header
-    let y = 70;
+    doc.text('INVOICE', 105, 28, { align: 'center' });
+    doc.setFontSize(11);
+    doc.setTextColor(60, 60, 60); // Darker color for details
+    doc.text(`Invoice #: ${sale.id}`, 15, 40);
+    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 15, 46);
+    doc.text(`Customer: ${sale.customerName}`, 15, 52);
+
+    // Table header (full width, taller and darker gray)
+    let y = 60;
+    doc.setFillColor(50, 50, 50); // Darker gray
+    doc.rect(10, y, 190, 18, 'F'); // Taller header
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Product', 20, y);
-    doc.text('Qty', 120, y);
-    doc.text('Price', 140, y);
-    doc.text('Total', 170, y);
-    
-    // Table items
-    y += 10;
+    doc.text('Product', 25, y + 12);
+    doc.text('Qty', 95, y + 12, { align: 'center' });
+    doc.text('Price', 140, y + 12, { align: 'center' });
+    doc.text('Total', 185, y + 12, { align: 'right' });
+
+    // Table items (full width, bigger rows and box, improved vertical alignment)
+    y += 18;
     doc.setFont('helvetica', 'normal');
-    
-    sale.items.forEach(item => {
-        // Find customer discount
-        const customer = customers.find(c => c.id === sale.customerId);
-        const discount = customer ? customer.discount || 0 : 0;
-        // Remove any unwanted superscript or small '1' by using Unicode normalization and plain string
-        const priceText = `₹${item.price.toFixed(2)}`.normalize('NFKC').replace(/[^\d₹.]/g, '');
-        const totalText = `₹${item.total.toFixed(2)}`.normalize('NFKC').replace(/[^\d₹.]/g, '');
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(item.productName.substring(0, 25), 20, y);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(String(item.quantity), 120, y);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(priceText, 140, y);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(totalText, 170, y);
-        y += 10;
-        // Only show discount info if discount > 0
-        if (discount > 0) {
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Discount Applied: ${discount}%`, 20, y);
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            y += 8;
-        }
+    doc.setFontSize(12);
+    sale.items.forEach((item, idx) => {
+        doc.setFillColor(idx % 2 === 0 ? 220 : 240, 220, 220); // More visible gray
+        doc.rect(10, y, 190, 18, 'F'); // Consistent row height
+        doc.setTextColor(30, 30, 30);
+        doc.text(item.productName.substring(0, 40), 25, y + 12);
+        doc.text(String(item.quantity), 95, y + 12, { align: 'center' });
+        doc.text(formatINR(item.price), 140, y + 12, { align: 'center' });
+        doc.text(formatINR(item.total), 185, y + 12, { align: 'right' });
+        y += 18;
     });
-    
-    // Totals
-    y += 10;
+
+    // Totals section (right aligned, bigger)
+    y += 8;
     doc.setFont('helvetica', 'bold');
-    doc.text(`Subtotal: ₹${sale.subtotal.toFixed(2)}`, 140, y);
+    doc.setFontSize(13);
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Subtotal: ${formatINR(sale.subtotal)}`, 185, y, { align: 'right' });
     y += 10;
-    doc.text(`Total: ₹${sale.total.toFixed(2)}`, 140, y);
-    
+    doc.text(`Total: ${formatINR(sale.total)}`, 185, y, { align: 'right' });
+
     // Footer
-    // Removed 'Thank you for your business!' from invoice footer
-    
+    y += 20;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(11);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Thank you for your business!', 105, y, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text('Contact: 9343164333', 105, y + 7, { align: 'center' });
+
     // Save PDF and send via WhatsApp
     const pdfFileName = `sale-invoice-${sale.id}.pdf`;
     doc.save(pdfFileName);
     if (sendWhatsApp && phone) {
-        // WhatsApp does not support direct file sending via URL, but you can send the message and instruct to check email for PDF
         const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${billText}%0A%0AInvoice PDF sent to your email.`;
         window.open(whatsappUrl, '_blank');
-        // Optionally, send PDF via email (requires backend)
     }
-}
-
-// PURCHASE FUNCTIONS
-function renderPurchaseForm() {
-    const container = document.getElementById('purchase-items-container');
-    if (!container) return;
-    // Simple purchase item row for demonstration
-    container.innerHTML = `
-        <div class="row mb-3 align-items-end border-bottom pb-3">
-            <div class="col-md-6">
-                <label class="form-label fw-bold">Product Name</label>
-                <input type="text" class="form-control" id="purchase-product-name" placeholder="Enter product name" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Quantity</label>
-                <input type="number" class="form-control" id="purchase-product-qty" min="1" value="1" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Cost Price (₹)</label>
-                <input type="number" class="form-control" id="purchase-product-cost" min="0" step="0.01" required>
-            </div>
-        </div>
-    `;
+    // Removed invalid HTML/JSX from JS file
 }
 
 function handlePurchaseSubmit(e) {
@@ -1305,36 +1386,35 @@ function handlePurchaseSubmit(e) {
 }
 
 function generatePurchaseInvoice(purchase) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Gratitude Nutrition Club', 20, 30);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Purchase Invoice', 20, 45);
-    doc.setFontSize(10);
-    doc.text(`Invoice #: ${purchase.id}`, 120, 30);
-    doc.text(`Date: ${new Date(purchase.date).toLocaleDateString()}`, 120, 40);
-    doc.text(`Supplier: ${purchase.supplier}`, 120, 50);
+    var purchaseDoc = typeof jsPDF !== 'undefined' ? new jsPDF() : null;
+    purchaseDoc.setFontSize(20);
+    purchaseDoc.setFont('helvetica', 'bold');
+    purchaseDoc.text('Gratitude Nutrition Club', 20, 30);
+    purchaseDoc.setFontSize(14);
+    purchaseDoc.setFont('helvetica', 'normal');
+    purchaseDoc.text('Purchase Invoice', 20, 45);
+    purchaseDoc.setFontSize(10);
+    purchaseDoc.text('Invoice #: ' + purchase.id, 120, 30);
+    purchaseDoc.text('Date: ' + new Date(purchase.date).toLocaleDateString(), 120, 40);
+    purchaseDoc.text('Supplier: ' + purchase.supplier, 120, 50);
     let y = 70;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Product', 20, y);
-    doc.text('Qty', 120, y);
-    doc.text('Cost', 140, y);
-    doc.text('Total', 170, y);
+    purchaseDoc.setFont('helvetica', 'bold');
+    purchaseDoc.text('Product', 20, y);
+    purchaseDoc.text('Qty', 120, y);
+    purchaseDoc.text('Cost', 140, y);
+    purchaseDoc.text('Total', 170, y);
     y += 10;
-    doc.setFont('helvetica', 'normal');
-    doc.text(purchase.productName.substring(0, 25), 20, y);
-    doc.text(String(purchase.quantity), 120, y);
-    doc.text(`₹${purchase.cost.toFixed(2)}`, 140, y);
-    doc.text(`₹${purchase.total.toFixed(2)}`, 170, y);
+    purchaseDoc.setFont('helvetica', 'normal');
+    purchaseDoc.text(purchase.productName.substring(0, 25), 20, y);
+    purchaseDoc.text(String(purchase.quantity), 120, y);
+    purchaseDoc.text('₹' + purchase.cost.toFixed(2), 140, y);
+    purchaseDoc.text('₹' + purchase.total.toFixed(2), 170, y);
     y += 20;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total: ₹${purchase.total.toFixed(2)}`, 140, y);
+    purchaseDoc.setFont('helvetica', 'bold');
+    purchaseDoc.text('Total: ₹' + purchase.total.toFixed(2), 140, y);
     // Removed 'Thank you for your business!' from invoice footer
-    const pdfFileName = `purchase-invoice-${purchase.id}.pdf`;
-    doc.save(pdfFileName);
+    const pdfFileName = 'purchase-invoice-' + purchase.id + '.pdf';
+    purchaseDoc.save(pdfFileName);
 }
 
 // Set active dashboard tab on load
@@ -1473,4 +1553,4 @@ function renderReports() {
         return `<tr><td>${product.name || ''}</td><td>${product.category || ''}</td><td>${product.stock || 0}</td><td>${product.minStock || 0}</td><td>₹${(price * product.stock).toFixed(2)}</td><td><span class="status-dot ${status.dotClass}"></span><span class="badge ${status.badgeClass}">${status.text}</span></td></tr>`;
     }).join('');
     document.getElementById('stock-total-vp').textContent = totalVP.toFixed(2);
-}
+    }
