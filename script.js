@@ -327,6 +327,32 @@ function setupEventListeners() {
     document.querySelectorAll('input[name="report-filter"]').forEach(radio => {
         radio.addEventListener('change', renderReports);
     });
+    
+    // Send SMS button
+    document.getElementById('send-sms-btn').addEventListener('click', function() {
+        const customerSelect = document.getElementById('sale-customer');
+        const customerId = customerSelect.value;
+        if (!customerId) {
+            showAlert('Please select a customer to send the SMS.', 'danger');
+            return;
+        }
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer || !customer.phone) {
+            showAlert('Customer phone number not found.', 'danger');
+            return;
+        }
+        let billText = `${BILLING_NAME} Invoice\n\nDear ${customer.name},\nThank you for choosing us!\n\nOrder Details:\n`;
+        saleItems.forEach(item => {
+            if (item.productId) {
+                const product = products.find(p => p.id === item.productId);
+                billText += `${product.name} x${item.quantity} - ₹${item.total.toFixed(2)}\n`;
+            }
+        });
+        billText += `\nTotal Amount: ₹${saleItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}\n\nWe appreciate your business.\n${BILLING_NAME}`;
+        const smsBody = encodeURIComponent(billText);
+        const smsUrl = `sms:${customer.phone}?body=${smsBody}`;
+        window.open(smsUrl, '_blank');
+    });
 }
 
 // Load all data
@@ -1270,6 +1296,7 @@ function sendBillToCustomer() {
         total: saleItems.reduce((sum, item) => sum + item.total, 0)
     };
     try {
+        completeSale(sale);
         generateSaleInvoice(sale, true, customer.phone, billText);
         showAlert('Sale completed and invoice downloaded!', 'success');
     } catch (err) {
@@ -1342,7 +1369,7 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(11);
     doc.setTextColor(120, 120, 120);
-    doc.text('Thank you for your business!', 105, y, { align: 'center' });
+    doc.text('Thank you for choosing us', 105, y, { align: 'center' });
     doc.setFontSize(9);
     doc.text('Contact: 9343164333', 105, y + 7, { align: 'center' });
 
@@ -1352,8 +1379,22 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
     if (sendWhatsApp && phone) {
         const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${billText}%0A%0AInvoice PDF sent to your email.`;
         window.open(whatsappUrl, '_blank');
+        // SMS link (mobile only)
+        const smsBody = encodeURIComponent(billText.replace(/%0A/g, '\n'));
+        const smsUrl = `sms:${phone}?body=${smsBody}`;
+        // Show SMS button
+        const smsBtn = document.createElement('a');
+        smsBtn.href = smsUrl;
+        smsBtn.textContent = 'Send SMS';
+        smsBtn.className = 'btn btn-primary ms-2';
+        smsBtn.style.position = 'fixed';
+        smsBtn.style.top = '80px';
+        smsBtn.style.right = '20px';
+        smsBtn.style.zIndex = '9999';
+        document.body.appendChild(smsBtn);
+        setTimeout(() => { smsBtn.remove(); }, 15000); // Remove after 15s
     }
-    // Removed invalid HTML/JSX from JS file
+    // ...existing code...
 }
 
 function handlePurchaseSubmit(e) {
@@ -1511,10 +1552,22 @@ function handleSaleSubmit(e) {
         tax: 0, // GST removed
         total: saleItems.reduce((sum, item) => sum + item.total, 0)
     };
+    completeSale(sale);
+    showAlert('Sale completed and invoice generated!', 'success');
+    generateSaleInvoice(sale);
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('salesModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+// Shared function to finalize sale, update stock, and reports
+function completeSale(sale) {
     sales.push(sale);
     saveToStorage('herbalife_sales', sales);
     // Reduce stock
-    saleItems.forEach(item => {
+    sale.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) {
             product.stock -= item.quantity;
@@ -1525,8 +1578,7 @@ function handleSaleSubmit(e) {
     renderDashboard();
     renderSalesForm();
     renderPurchaseForm(); // Ensure purchase form updates after sale
-    showAlert('Sale completed and invoice generated!', 'success');
-    generateSaleInvoice(sale);
+    renderReports();
 }
 
 // REPORTS FUNCTIONS
