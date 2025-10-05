@@ -287,6 +287,36 @@
                         </div>
                     </div>
                 </form>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Date Range</label>
+                        <input type="date" id="sales-start-date" class="form-control" />
+                        <input type="date" id="sales-end-date" class="form-control mt-1" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Month</label>
+                        <select id="sales-month" class="form-select">
+                            <option value="">Select Month</option>
+                            <!-- Months will be populated by JS -->
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" id="filter-sales-report">Filter Report</button>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Sales Report
+                        </h5>
+                    </div>
+                    <div class="card-body" id="sales-report-container">
+                        <!-- Sales report table will be populated by JavaScript -->
+                    </div>
+                </div>
             </div>
 
             <!-- Purchases Section -->

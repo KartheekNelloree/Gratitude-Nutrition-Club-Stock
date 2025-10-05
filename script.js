@@ -402,8 +402,14 @@ function renderDashboard() {
     renderQuickOverview(stats);
     renderLowStockAlert(stats);
     // Daily Sales Report
-    const today = new Date().toISOString().slice(0, 10);
-    const todaysSales = sales.filter(sale => sale.date.slice(0, 10) === today);
+    const todayDate = new Date();
+    const todayDay = todayDate.getDate();
+    const todayMonth = todayDate.getMonth();
+    const todayYear = todayDate.getFullYear();
+    const todaysSales = sales.filter(sale => {
+        const saleDate = new Date(sale.date);
+        return saleDate.getDate() === todayDay && saleDate.getMonth() === todayMonth && saleDate.getFullYear() === todayYear;
+    });
     let reportHtml = '';
     if (todaysSales.length === 0) {
         reportHtml = '<div class="text-muted">No sales recorded today.</div>';
@@ -1605,4 +1611,68 @@ function renderReports() {
         return `<tr><td>${product.name || ''}</td><td>${product.category || ''}</td><td>${product.stock || 0}</td><td>${product.minStock || 0}</td><td>₹${(price * product.stock).toFixed(2)}</td><td><span class="status-dot ${status.dotClass}"></span><span class="badge ${status.badgeClass}">${status.text}</span></td></tr>`;
     }).join('');
     document.getElementById('stock-total-vp').textContent = totalVP.toFixed(2);
+}
+
+// Populate month dropdown
+function populateSalesMonthDropdown() {
+    const select = document.getElementById('sales-month');
+    if (!select) return;
+    select.innerHTML = '<option value="">Select Month</option>';
+    for (let m = 0; m < 12; m++) {
+        const monthName = new Date(2000, m, 1).toLocaleString('default', { month: 'long' });
+        select.innerHTML += `<option value="${m+1}">${monthName}</option>`;
     }
+}
+
+document.addEventListener('DOMContentLoaded', populateSalesMonthDropdown);
+
+// Filter sales report by date or month
+function filterSalesReport() {
+    const startDate = document.getElementById('sales-start-date').value;
+    const endDate = document.getElementById('sales-end-date').value;
+    const month = document.getElementById('sales-month').value;
+    let filteredSales = sales;
+    // If any filter is selected, apply intersection
+    if (month) {
+        filteredSales = filteredSales.filter(sale => {
+            const saleMonth = new Date(sale.date).getMonth() + 1;
+            return saleMonth == month;
+        });
+    }
+    if (startDate) {
+        const start = new Date(startDate);
+        filteredSales = filteredSales.filter(sale => new Date(sale.date) >= start);
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        filteredSales = filteredSales.filter(sale => new Date(sale.date) <= end);
+    }
+    renderSalesReportTable(filteredSales);
+}
+
+document.getElementById('filter-sales-report').addEventListener('click', filterSalesReport);
+
+// Render filtered sales report table
+function renderSalesReportTable(filteredSales) {
+    const reportContainer = document.getElementById('sales-report-container');
+    let reportHtml = '';
+    if (!filteredSales || filteredSales.length === 0) {
+        reportHtml = `<div class="alert alert-warning text-center mt-3">No sales records found for the selected filter.</div>`;
+    } else {
+        reportHtml = `<table class="table table-bordered table-striped">
+            <thead class="table-success"><tr><th>Date</th><th>Time</th><th>Customer</th><th>Products</th><th>Total (₹)</th><th>Discount (%)</th></tr></thead><tbody>`;
+        filteredSales.forEach(sale => {
+            const saleDate = new Date(sale.date);
+            const time = saleDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const date = saleDate.toLocaleDateString();
+            const products = sale.items.map(i => `${i.productName} x${i.quantity}`).join('<br>');
+            // Find customer discount
+            let discount = '';
+            const customer = customers && customers.find(c => c.id === sale.customerId);
+            if (customer && customer.discount) discount = customer.discount;
+            reportHtml += `<tr><td>${date}</td><td>${time}</td><td>${sale.customerName}</td><td>${products}</td><td>₹${sale.total.toFixed(2)}</td><td>${discount}</td></tr>`;
+        });
+        reportHtml += '</tbody></table>';
+    }
+    reportContainer.innerHTML = reportHtml;
+}
