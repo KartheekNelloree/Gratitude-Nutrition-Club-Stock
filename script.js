@@ -12,6 +12,21 @@ function renderPurchaseForm() {
         purchaseItems = [{ id: Date.now(), productId: '', quantity: 1, price: 0 }];
     }
     container.innerHTML = purchaseItems.map((item, index) => {
+        // Auto-fill price when product is selected
+        let priceValue = item.price;
+        if (item.productId && (!item.price || item.price === 0)) {
+            const product = products.find(p => p.id === item.productId);
+            if (product) {
+                // Prefer product.prices['50'] if available, else fallback to mrp
+                if (product.prices && product.prices['50']) {
+                    priceValue = product.prices['50'];
+                } else if (product.mrp) {
+                    priceValue = product.mrp;
+                }
+                // Update item.price so it persists
+                item.price = priceValue;
+            }
+        }
         return `
         <div class="row mb-3 align-items-center gx-2" data-item-id="${item.id}">
             <div class="col-lg-5 col-md-6 col-12">
@@ -27,11 +42,11 @@ function renderPurchaseForm() {
             </div>
             <div class="col-lg-3 col-md-2 col-6">
                 <label class="form-label fw-bold">Price</label>
-                <input type="number" class="form-control" min="0" step="0.01" value="${item.price}" onchange="updatePurchaseItem(${index}, 'price', parseFloat(this.value) || 0)">
+                <input type="number" class="form-control" min="0" step="0.01" value="${priceValue}" onchange="updatePurchaseItem(${index}, 'price', parseFloat(this.value) || 0)">
             </div>
             <div class="col-lg-2 col-md-2 col-12">
                 <label class="form-label fw-bold">Total</label>
-                <div class="form-control bg-light fw-bold text-success" style="text-align:right;">Rs. ${(item.quantity * item.price).toFixed(2)}</div>
+                <div class="form-control bg-light fw-bold text-success" style="text-align:right;">Rs. ${(item.quantity * priceValue).toFixed(2)}</div>
             </div>
         </div>
         `;
@@ -41,8 +56,33 @@ function renderPurchaseForm() {
 function updatePurchaseItem(index, field, value) {
     if (!purchaseItems[index]) return;
     purchaseItems[index][field] = value;
+    // Auto-fill price when productId is selected
+    if (field === 'productId') {
+        const product = products.find(p => p.id === value);
+        if (product) {
+            // Prefer product.prices['50'] if available, else fallback to mrp
+            if (product.prices && product.prices['50']) {
+                purchaseItems[index].price = product.prices['50'];
+            } else if (product.mrp) {
+                purchaseItems[index].price = product.mrp;
+            }
+        }
+    }
     renderPurchaseForm();
     updatePurchaseSummary();
+    // After rendering, set the price input value in the DOM for this item
+    setTimeout(() => {
+        const container = document.getElementById('purchase-items-container');
+        if (container) {
+            const rows = container.querySelectorAll('.row[data-item-id]');
+            if (rows[index]) {
+                const priceInput = rows[index].querySelector('input[type="number"][class*="form-control"]');
+                if (priceInput) {
+                    priceInput.value = purchaseItems[index].price;
+                }
+            }
+        }
+    }, 0);
 }
 
 // Update purchase summary
@@ -65,15 +105,92 @@ let sales = [];
 let purchases = [];
 let currentEditingProduct = null;
 let currentEditingCustomer = null;
+// Supabase config - set these values (paste from your Supabase project settings)
+// Example:
+// const SUPABASE_URL = 'https://xyzcompany.supabase.co';
+// const SUPABASE_ANON_KEY = 'public-anon-key';
+const SUPABASE_URL = window.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
+let supabase = null;
+
+function initSupabase() {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        console.warn('Supabase keys not provided. Using localStorage fallback.');
+        return;
+    }
+    try {
+        // The UMD build exposes a global that provides createClient. Try common names.
+        const factory = (window.supabase && window.supabase.createClient) ? window.supabase.createClient :
+                        (window.Supabase && window.Supabase.createClient) ? window.Supabase.createClient :
+                        (window.supabasejs && window.supabasejs.createClient) ? window.supabasejs.createClient : null;
+        if (!factory) throw new Error('Supabase UMD factory not found. Ensure CDN loaded.');
+        supabase = factory(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('Supabase initialized');
+    } catch (err) {
+        console.error('Error initializing Supabase:', err);
+        supabase = null;
+    }
+}
+
+// Generic helpers: use Supabase if available, else localStorage
+async function dbGet(table) {
+    if (supabase) {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) { console.error(error); return []; }
+        return data;
+    }
+    return getFromStorage(`herbalife_${table}`, []);
+}
+
+async function dbInsert(table, payload) {
+    if (supabase) {
+        const { data, error } = await supabase.from(table).insert([payload]).select();
+        if (error) { console.error(error); throw error; }
+        return data[0];
+    }
+    // local fallback
+    const arr = getFromStorage(`herbalife_${table}`, []);
+    arr.push(payload);
+    saveToStorage(`herbalife_${table}`, arr);
+    return payload;
+}
+
+async function dbUpdate(table, id, payload) {
+    if (supabase) {
+        const { data, error } = await supabase.from(table).update(payload).eq('id', id).select();
+        if (error) { console.error(error); throw error; }
+        return data[0];
+    }
+    const arr = getFromStorage(`herbalife_${table}`, []);
+    const idx = arr.findIndex(x => x.id === id);
+    if (idx !== -1) { arr[idx] = { ...arr[idx], ...payload }; saveToStorage(`herbalife_${table}`, arr); return arr[idx]; }
+    throw new Error('Record not found');
+}
+
+async function dbDelete(table, id) {
+    if (supabase) {
+        const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+        if (error) { console.error(error); throw error; }
+        return data[0];
+    }
+    let arr = getFromStorage(`herbalife_${table}`, []);
+    arr = arr.filter(x => x.id !== id);
+    saveToStorage(`herbalife_${table}`, arr);
+    return true;
+}
+
+// Initialize supabase client on load
+initSupabase();
 let saleItems = [];
 let purchaseItems = [];
 
 // Update: Use billing name in messages and PDF
+// (Removed Supabase initialization, restoring localStorage logic)
 const BILLING_NAME = 'Gratitude Nutrition Club';
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+document.addEventListener('DOMContentLoaded', async function() {
+    await initializeApp();
     initializeSampleData();
     showSection('dashboard');
     updateLastUpdated();
@@ -89,11 +206,21 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Initialize the application
-function initializeApp() {
+async function initializeApp() {
     console.log('Herbalife Inventory Management System - Initializing...');
-    
-    // Load data from localStorage
-    products = getFromStorage('herbalife_products', []);
+
+    // Try loading data from Supabase first, fallback to localStorage
+    try {
+        const remoteProducts = await dbGet('products');
+        if (remoteProducts && Array.isArray(remoteProducts) && remoteProducts.length > 0) {
+            products = remoteProducts;
+        } else {
+            products = getFromStorage('herbalife_products', []);
+        }
+    } catch (err) {
+        console.warn('Could not load products from Supabase, using localStorage:', err);
+        products = getFromStorage('herbalife_products', []);
+    }
     // Migrate any products with global/shared priceTiers to per-product priceTiers
     products.forEach(product => {
         // If product has prices, do nothing
@@ -114,14 +241,66 @@ function initializeApp() {
         }
     });
     saveToStorage('herbalife_products', products);
-    customers = getFromStorage('herbalife_customers', []);
-    sales = getFromStorage('herbalife_sales', []);
-    purchases = getFromStorage('herbalife_purchases', []);
+    try {
+        const remoteCustomers = await dbGet('customers');
+        customers = (remoteCustomers && remoteCustomers.length > 0) ? remoteCustomers : getFromStorage('herbalife_customers', []);
+    } catch (err) { customers = getFromStorage('herbalife_customers', []); }
+    try {
+        const remoteSales = await dbGet('sales');
+        sales = (remoteSales && remoteSales.length > 0) ? remoteSales : getFromStorage('herbalife_sales', []);
+    } catch (err) { sales = getFromStorage('herbalife_sales', []); }
+    try {
+        const remotePurchases = await dbGet('purchases');
+        purchases = (remotePurchases && remotePurchases.length > 0) ? remotePurchases : getFromStorage('herbalife_purchases', []);
+    } catch (err) { purchases = getFromStorage('herbalife_purchases', []); }
     
     console.log(`Loaded: ${products.length} products, ${customers.length} customers, ${sales.length} sales, ${purchases.length} purchases`);
 }
 
+// Migration helper: push localStorage data to Supabase (idempotent)
+async function migrateLocalToSupabase() {
+    if (!supabase) {
+        showAlert('Supabase not initialized. Cannot migrate.', 'danger');
+        return;
+    }
+    const localProducts = getFromStorage('herbalife_products', []);
+    let created = 0;
+    for (const p of localProducts) {
+        try {
+            // Upsert by id
+            const { data, error } = await supabase.from('products').upsert(p, { onConflict: ['id'] }).select();
+            if (error) { console.error('Upsert product error', error); }
+            else created += 1;
+        } catch (err) { console.error('Migrate product error', err); }
+    }
+    showAlert(`Migration complete. Upserted ${created} products.`, 'success');
+}
+
 // Storage utilities
+function getFromStorage(key, defaultValue) {
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : defaultValue;
+    } catch (error) {
+        console.error('Error loading from storage:', error);
+        return defaultValue;
+    }
+}
+
+function saveToStorage(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+        console.error('Error saving to storage:', error);
+        showAlert('Error saving data. Please try again.', 'danger');
+    }
+}
+// Supabase product functions
+async function fetchProducts() {
+    const { data, error } = await supabase.from('products').select('*');
+    if (error) { console.error(error); return []; }
+    return data;
+}
 function getFromStorage(key, defaultValue) {
     try {
         const stored = localStorage.getItem(key);
@@ -773,8 +952,11 @@ function editProduct(id) {
     modal.show();
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
     if (confirm('Are you sure you want to delete this product?')) {
+        try {
+            if (supabase) await dbDelete('products', id);
+        } catch (err) { console.error('Error deleting product from Supabase', err); }
         products = products.filter(p => p.id !== id);
         saveToStorage('herbalife_products', products);
         renderProducts();
@@ -783,7 +965,7 @@ function deleteProduct(id) {
     }
 }
 
-function handleProductSubmit(e) {
+async function handleProductSubmit(e) {
     e.preventDefault();
     
     const formData = {
@@ -814,6 +996,9 @@ function handleProductSubmit(e) {
                 updatedAt: new Date().toISOString()
             };
         }
+        try {
+            if (supabase) await dbUpdate('products', currentEditingProduct.id, products[index]);
+        } catch (err) { console.error('Error updating product in Supabase', err); }
         showAlert('Product updated successfully!');
     } else {
         // Add new product
@@ -825,6 +1010,9 @@ function handleProductSubmit(e) {
             updatedAt: new Date().toISOString()
         };
         products.push(newProduct);
+        try {
+            if (supabase) await dbInsert('products', newProduct);
+        } catch (err) { console.error('Error inserting product into Supabase', err); }
         showAlert('Product added successfully!');
     }
     // Save all products with their own prices to localStorage
@@ -1319,65 +1507,102 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
     // Use 'Rs.' prefix to avoid font issues with ₹
     const formatINR = (value) => `Rs. ${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    // Full-width header with big club name
-    doc.setFillColor(30, 30, 30);
-    doc.rect(0, 0, 210, 32, 'F');
-    doc.setFontSize(26);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Gratitude Nutrition Club', 105, 15, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text('INVOICE', 105, 28, { align: 'center' });
-    doc.setFontSize(11);
-    doc.setTextColor(60, 60, 60); // Darker color for details
-    doc.text(`Invoice #: ${sale.id}`, 15, 40);
-    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 15, 46);
-    doc.text(`Customer: ${sale.customerName}`, 15, 52);
+    // Layout helpers and pagination
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const rowHeight = 18;
+    const headerTopHeight = 60; // y start for table header on each page
 
-    // Table header (full width, taller and darker gray)
-    let y = 60;
-    doc.setFillColor(50, 50, 50); // Darker gray
-    doc.rect(10, y, 190, 18, 'F'); // Taller header
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Product', 25, y + 12);
-    doc.text('Qty', 95, y + 12, { align: 'center' });
-    doc.text('Price', 140, y + 12, { align: 'center' });
-    doc.text('Total', 185, y + 12, { align: 'right' });
+    function drawHeader() {
+        // Full-width header with big club name
+        doc.setFillColor(30, 30, 30);
+        doc.rect(0, 0, pageWidth, 32, 'F');
+        doc.setFontSize(26);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Gratitude Nutrition Club', pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(14);
+        doc.text('INVOICE', pageWidth / 2, 28, { align: 'center' });
+        doc.setFontSize(11);
+        doc.setTextColor(60, 60, 60); // Darker color for details
+        doc.text(`Invoice #: ${sale.id}`, margin + 5, 40);
+        doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, margin + 5, 46);
+        doc.text(`Customer: ${sale.customerName}`, margin + 5, 52);
+    }
 
-    // Table items (full width, bigger rows and box, improved vertical alignment)
+    function drawTableHeader(yPos) {
+        doc.setFillColor(50, 50, 50);
+        doc.rect(margin, yPos, contentWidth, 18, 'F');
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Product', margin + 15, yPos + 12);
+        doc.text('Qty', margin + 85, yPos + 12, { align: 'center' });
+        doc.text('Price', margin + 135, yPos + 12, { align: 'center' });
+        doc.text('Total', margin + contentWidth - 10, yPos + 12, { align: 'right' });
+    }
+
+    // Start rendering
+    drawHeader();
+    let y = headerTopHeight;
+    drawTableHeader(y);
     y += 18;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(12);
+
     sale.items.forEach((item, idx) => {
-        doc.setFillColor(idx % 2 === 0 ? 220 : 240, 220, 220); // More visible gray
-        doc.rect(10, y, 190, 18, 'F'); // Consistent row height
+        // If not enough space for the next row plus totals/footer, add a new page
+        const spaceNeeded = rowHeight + 60; // leave room for totals and footer
+        if (y + spaceNeeded > pageHeight - margin) {
+            doc.addPage();
+            drawHeader();
+            y = headerTopHeight;
+            drawTableHeader(y);
+            y += 18;
+        }
+
+        // Row background
+        const bgShade = idx % 2 === 0 ? 220 : 240;
+        doc.setFillColor(bgShade, bgShade, bgShade);
+        doc.rect(margin, y, contentWidth, rowHeight, 'F');
         doc.setTextColor(30, 30, 30);
-        doc.text(item.productName.substring(0, 40), 25, y + 12);
-        doc.text(String(item.quantity), 95, y + 12, { align: 'center' });
-        doc.text(formatINR(item.price), 140, y + 12, { align: 'center' });
-        doc.text(formatINR(item.total), 185, y + 12, { align: 'right' });
-        y += 18;
+        doc.text(item.productName.substring(0, 60), margin + 15, y + 12);
+        doc.text(String(item.quantity), margin + 85, y + 12, { align: 'center' });
+        doc.text(formatINR(item.price), margin + 135, y + 12, { align: 'center' });
+        doc.text(formatINR(item.total), margin + contentWidth - 10, y + 12, { align: 'right' });
+        y += rowHeight;
     });
 
     // Totals section (right aligned, bigger)
+    const totalsHeight = 30;
+    if (y + totalsHeight + margin > pageHeight) {
+        doc.addPage();
+        drawHeader();
+        y = headerTopHeight + 18; // leave table header space
+    }
     y += 8;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(30, 30, 30);
-    doc.text(`Subtotal: ${formatINR(sale.subtotal)}`, 185, y, { align: 'right' });
+    doc.text(`Subtotal: ${formatINR(sale.subtotal)}`, margin + contentWidth, y, { align: 'right' });
     y += 10;
-    doc.text(`Total: ${formatINR(sale.total)}`, 185, y, { align: 'right' });
+    doc.text(`Total: ${formatINR(sale.total)}`, margin + contentWidth, y, { align: 'right' });
 
     // Footer
     y += 20;
+    if (y + 20 > pageHeight - margin) {
+        doc.addPage();
+        drawHeader();
+        y = headerTopHeight + 40;
+    }
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(11);
     doc.setTextColor(120, 120, 120);
-    doc.text('Thank you for choosing us', 105, y, { align: 'center' });
+    doc.text('Thank you for choosing us', pageWidth / 2, y, { align: 'center' });
     doc.setFontSize(9);
-    doc.text('Contact: 9343164333', 105, y + 7, { align: 'center' });
+    doc.text('Contact: 9343164333', pageWidth / 2, y + 7, { align: 'center' });
 
     // Save PDF and send via WhatsApp
     const pdfFileName = `sale-invoice-${sale.id}.pdf`;
@@ -1404,32 +1629,39 @@ function generateSaleInvoice(sale, sendWhatsApp = false, phone = '', billText = 
 }
 
 function handlePurchaseSubmit(e) {
-    e.preventDefault();
-    // Get purchase details from form
-    const productName = document.getElementById('purchase-product-name').value.trim();
-    const quantity = parseInt(document.getElementById('purchase-product-qty').value);
-    const cost = parseFloat(document.getElementById('purchase-product-cost').value);
-    const supplier = document.getElementById('purchase-supplier').value.trim();
-    if (!productName || !quantity || !cost || !supplier) {
-        showAlert('Please fill all purchase fields.', 'danger');
-        return;
-    }
-    // Create purchase object
-    const purchase = {
-        id: generateId(),
-        productName,
-        quantity,
-        cost,
-        supplier,
-        date: new Date().toISOString(),
-        total: quantity * cost
-    };
-    purchases.push(purchase);
-    saveToStorage('herbalife_purchases', purchases);
-    renderDashboard();
-    showAlert('Purchase completed and invoice generated!', 'success');
-    generatePurchaseInvoice(purchase);
-    document.getElementById('purchase-form').reset();
+        e.preventDefault();
+        // Get purchase details from form
+        const productId = document.getElementById('purchase-product-name').value;
+        const product = products.find(p => p.id == productId);
+        const quantity = parseInt(document.getElementById('purchase-product-qty').value);
+        const cost = parseFloat(document.getElementById('purchase-product-cost').value);
+        const supplier = document.getElementById('purchase-supplier').value.trim();
+        if (!product || !quantity || !cost || !supplier) {
+            showAlert('Please fill all purchase fields.', 'danger');
+            return;
+        }
+        // Create purchase object
+        const purchase = {
+            id: generateId(),
+            productId: product.id,
+            productName: product.name,
+            quantity,
+            cost,
+            supplier,
+            date: new Date().toISOString(),
+            total: quantity * cost
+        };
+        purchases.push(purchase);
+        saveToStorage('herbalife_purchases', purchases);
+        // Update product stock
+        product.stock = (product.stock || 0) + quantity;
+        product.updatedAt = new Date().toISOString();
+        saveToStorage('herbalife_products', products);
+        renderProducts();
+        renderDashboard();
+        showAlert('Purchase completed and invoice generated!', 'success');
+        generatePurchaseInvoice(purchase);
+        document.getElementById('purchase-form').reset();
 }
 
 function generatePurchaseInvoice(purchase) {
@@ -1506,8 +1738,6 @@ function updateProductSelects() {
         // Always set price when product is selected
         select.addEventListener('change', function() {
             const row = select.closest('.sale-product-row');
-            const productId = select.value;
-            const product = products.find(p => p.id == productId);
             if (product) {
                 const priceInput = row.querySelector('.price-input');
                 priceInput.value = product.mrp;
